@@ -309,20 +309,31 @@ namespace CNTK
         size_t packedDoubleGradientsSizeInBytes = 0;
         std::vector<size_t> packedFloatGradientsIndex;
         std::vector<size_t> packedDoubleGradientsIndex;
+        auto packedDevice = inputValues[0]->Device();
         for (auto i = 0; i < numValues; i++)
         {
-            // Push index to packing queue if the gradient's size is less than threshold size
-            if (!inputValues[i]->IsSliceView() && GetBufferSize(inputValues[i]) < m_packThresholdSizeInBytes && (inputValues[i]->GetDataType() == DataType::Float))
+            // only pack values on the same device
+            bool shouldPack = true;
+            if (inputValues[i]->Device() == packedDevice)
             {
-                packedFloatGradientsSizeInBytes += GetBufferSize(inputValues[i]);
-                packedFloatGradientsIndex.push_back(i);
+                // Push index to packing queue if the gradient's size is less than threshold size
+                if (!inputValues[i]->IsSliceView() && GetBufferSize(inputValues[i]) < m_packThresholdSizeInBytes && (inputValues[i]->GetDataType() == DataType::Float))
+                {
+                    packedFloatGradientsSizeInBytes += GetBufferSize(inputValues[i]);
+                    packedFloatGradientsIndex.push_back(i);
+                }
+                else if (!inputValues[i]->IsSliceView() && GetBufferSize(inputValues[i]) < m_packThresholdSizeInBytes && (inputValues[i]->GetDataType() == DataType::Double))
+                {
+                    packedDoubleGradientsSizeInBytes += GetBufferSize(inputValues[i]);
+                    packedDoubleGradientsIndex.push_back(i);
+                }
+                else
+                {
+                    shouldPack = false;
+                }
             }
-            else if (!inputValues[i]->IsSliceView() && GetBufferSize(inputValues[i]) < m_packThresholdSizeInBytes && (inputValues[i]->GetDataType() == DataType::Double))
-            {
-                packedDoubleGradientsSizeInBytes += GetBufferSize(inputValues[i]);
-                packedDoubleGradientsIndex.push_back(i);
-            }
-            else
+
+            if (!shouldPack)
             {
                 valuesToAggregate.push_back(inputValues[i]);
                 valuesAfterAggregate.push_back(outputValues[i]);
