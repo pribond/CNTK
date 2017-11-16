@@ -29,6 +29,10 @@
 #include "tensorboard/TensorBoardUtils.h"
 #include "Utils.h"
 
+#ifndef CNTK_UWP
+#include "ImageWriter.h"
+#endif // !CNTK_UWP
+
 namespace CNTK
 {
     namespace Internal
@@ -200,10 +204,8 @@ namespace CNTK
             extent.push_back(width);
             extent.push_back(depth);
             extent.push_back(1);
-            const int compression = -1;
             
             const std::vector<size_t> imageDim({height, width, depth});
-            NDShape imageShape(imageDim);
 
             for (size_t i = 0; i < batch_size; i++) {
                 tensorflow::Summary::Value* summaryValue = summary->add_value();
@@ -215,16 +217,16 @@ namespace CNTK
                 summaryImage->set_colorspace(depth);
                 start.back() = static_cast<size_t>(i);
                 auto image = imageData->SliceView(start, extent)->AsShape(imageDim);
-                vector<uchar> buffer;
+                vector<unsigned char> buffer;
 
                 switch (dtype)
                 {
                 case DataType::Float:
-                    WriteImageToBuffer(image->WritableDataBuffer<float>(), height, width, CV_32FC(depth), buffer);
+                    WriteImageToBuffer(image->WritableDataBuffer<float>(), Microsoft::MSR::CNTK::DataType::Float, height, width, depth, buffer);
                     break;
                 
                 case DataType::Double:
-                    WriteImageToBuffer(image->WritableDataBuffer<double>(), height, width, CV_64FC(depth), buffer);
+                    WriteImageToBuffer(image->WritableDataBuffer<double>(), Microsoft::MSR::CNTK::DataType::Double, height, width, depth, buffer);
                     break;
 
                 default:
@@ -238,7 +240,8 @@ namespace CNTK
             
             WriteRecord(Serialize(event));
         }
-#endif
+
+#endif // !CNTK_UWP
 
         void TensorBoardFileWriter::WriteVersion(time_t time)
         {
